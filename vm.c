@@ -30,15 +30,15 @@ seginit(void)
 }
 
 // Return the address of the PTE in page table pgdir
-// that corresponds to virtual address va.  If alloc!=0,
+// that corresponds to virtual address addr.  If alloc!=0,
 // create any required page table pages.
 static pte_t *
-walkpgdir(pde_t *pgdir, const void *va, int alloc)
+walkpgdir(pde_t *pgdir, const void *addr, int alloc)
 {
   pde_t *pde;
   pte_t *pgtab;
 
-  pde = &pgdir[PDX(va)];
+  pde = &pgdir[PDX(addr)];
   if(*pde & PTE_P){
     pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
   } else {
@@ -52,24 +52,24 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
     // entries, if necessary.
     *pde = V2P(pgtab) | PTE_P | PTE_W | PTE_U;
   }
-  return &pgtab[PTX(va)];
+  return &pgtab[PTX(addr)];
 }
 
-// Create PTEs for virtual addresses starting at va that refer to
-// physical addresses starting at pa. va and size might not
+// Create PTEs for virtual addresses starting at addr that refer to
+// physical addresses starting at pa. addr and size might not
 // be page-aligned.
 static int
-mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
+mappages(pde_t *pgdir, void *addr, uint size, uint pa, int perm)
 {
   char *a, *last;
   pte_t *pte;
 #ifdef TRACE_MAPPAGES
-  cprintf("mappages for pgdir %p, va %p, size 0x%x, pa 0x%x, perm %x\n",
-       pgdir, va, size, pa, perm);
+  cprintf("mappages for pgdir %p, addr %p, size 0x%x, pa 0x%x, perm %x\n",
+       pgdir, addr, size, pa, perm);
 #endif
 
-  a = (char*)PGROUNDDOWN((uint)va);
-  last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
+  a = (char*)PGROUNDDOWN((uint)addr);
+  last = (char*)PGROUNDDOWN(((uint)addr ) + size - 1);
   for(;;){
     if((pte = walkpgdir(pgdir, a, 1)) == 0)
       return -1;
@@ -399,3 +399,99 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 //PAGEBREAK!
 // Blank page.
 
+int mprotect(void* addr, int len){
+
+  cprintf("PID :%d", myproc()->pid);
+  //  cprintf("TEST");exit();
+  //char * addr;
+
+
+  int x;
+  //int num = argptr(0, &ptr, sizeof(ptr));
+  int num = argint(0, &x);
+  addr = (void*) x;
+  num++;
+  num = argint(1, &len);
+  if(len< 0){
+    return -1;
+  }
+  if(((int) addr % PGSIZE) != 0){
+    return -1;
+  }
+
+  pte_t *pte;
+  pte = walkpgdir(myproc()->pgdir, addr, 0);
+  if(*pte){
+    int i = 0;
+    for (i = (int)addr; i < ((int) addr + (len) *PGSIZE) ; i += PGSIZE){
+      pte = walkpgdir(myproc()->pgdir,(void*) i, 0);
+      //  cprintf("\nPTR %p:", pte);
+
+      if( ((*pte & PTE_U) != 0) && ((*pte & PTE_P) != 0) ){
+        //*pte = PADDR(pte) &(( PTE_P & PTE_U & PTE_W));
+        *pte = *pte & (~PTE_W) ;
+      cprintf("\nPTR %p:", pte);
+      }
+      else
+        return -1;
+    }
+  }
+  lcr3(V2P(myproc()->pgdir));
+
+  //int len;
+  //int num = argptr(0, &addr, sizeof(char *));
+
+   //cprintf("Argptr %p ", addr);
+
+  cprintf("\nPtr%p",addr );
+  cprintf("\nLen%d\n",len);
+
+  return 0;
+}
+
+int munprotect(void* addr, int len){
+
+  cprintf("PID :%d", myproc()->pid);
+  //  cprintf("TEST");exit();
+  //char * addr;
+
+  int x;
+  //int num = argptr(0, &ptr, sizeof(ptr));
+  int num = argint(0, &x);
+  addr = (void*) x;
+  num++;
+  num = argint(1, &len);
+  if(len< 0){
+    return -1;
+  }
+  if(((int) addr % PGSIZE) != 0){
+    return -1;
+  }
+
+  pte_t *pte;
+  pte = walkpgdir(myproc()->pgdir, addr, 0);
+  if(*pte){
+    int i = 0;
+    for (i = (int)addr; i < ((int) addr + (len) *PGSIZE) ; i += PGSIZE){
+      pte = walkpgdir(myproc()->pgdir,(void*) i, 0);
+      //  cprintf("\nPTR %p:", pte);
+
+      if( ((*pte & PTE_U) != 0) && ((*pte & PTE_P) != 0) ){
+        //*pte = PADDR(pte) &(( PTE_P & PTE_U & PTE_W));
+        *pte = *pte | (PTE_W) ;
+      cprintf("\nPTR %p:", pte);
+      }
+    }
+  }
+  lcr3(V2P(myproc()->pgdir));
+
+  //int len;
+  //int num = argptr(0, &addr, sizeof(char *));
+
+   //cprintf("Argptr %p ", addr);
+
+  cprintf("\nPtr%p",addr );
+  cprintf("\nLen%d\n",len);
+
+  return 0;
+}
